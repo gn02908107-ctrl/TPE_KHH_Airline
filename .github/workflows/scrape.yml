@@ -29,10 +29,10 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: 抓取桃園機場資料(TPE)
-        run: python scraper_tpe.py
+        run: python Scraper_TPE.py
 
       - name: 抓取高雄機場資料(KHH)
-        run: python scraper_khh.py
+        run: python Scraper_KHH.py
 
       - name: 提交並推送更新後的資料庫
         run: |
