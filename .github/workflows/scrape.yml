@@ -1,0 +1,47 @@
+name: 每日更新機場航班資料
+
+on:
+  schedule:
+    # UTC 16:30 = 台灣時間(UTC+8) 00:30,抓「昨天(台灣時間)」完整一天的航班資料
+    - cron: "30 16 * * *"
+  workflow_dispatch:  # 允許在 GitHub 網頁上手動觸發,方便測試或補資料
+
+permissions:
+  contents: write  # 需要寫入權限才能把更新後的 flights.db commit 回 repo
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    # 鎖定時區為台灣時間,避免 datetime.now() 用到 Actions 伺服器預設的 UTC 導致日期算錯
+    env:
+      TZ: Asia/Taipei
+
+    steps:
+      - name: 取得最新程式碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安裝套件
+        run: pip install -r requirements.txt
+
+      - name: 抓取桃園機場資料(TPE)
+        run: python scraper_tpe.py
+
+      - name: 抓取高雄機場資料(KHH)
+        run: python scraper_khh.py
+
+      - name: 提交並推送更新後的資料庫
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add flights.db
+          if git diff --cached --quiet; then
+            echo "沒有資料變動,略過提交"
+          else
+            git commit -m "自動更新航班資料 $(date +'%Y-%m-%d')"
+            git push
+          fi
