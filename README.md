@@ -6,7 +6,7 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**🔗 [線上 Demo](#)** ← 部署完成後把 Streamlit Cloud 網址貼在這裡
+**🔗 [線上 Demo]** https://tpekhhairline-jjhcwfvjjkqkrq3pwwkpfu.streamlit.app/ 
 
 ---
 
@@ -14,7 +14,6 @@
 
 這個專案的資料並非取用現成的政府開放資料集,而是**自行開發爬蟲程式,每天定時從機場官方網站 API 抓取最新航班資訊**,經過清洗後存入 SQLite 資料庫,再透過 Streamlit + Plotly 打造成一個可互動篩選的視覺化儀表板。
 
-專案目標是練習完整的資料工程流程:**資料擷取 → 清洗 → 儲存 → 視覺化**,並產出一個可以實際操作、對外展示的作品。
 
 ## 🎯 主要功能
 
@@ -80,16 +79,6 @@ streamlit run app.py
 ```
 
 啟動後瀏覽器會自動開啟 `http://localhost:8501`。
-
-## ☁️ 部署到 Streamlit Community Cloud
-
-1. 將 `app.py`、`flights.db`、`requirements.txt` 一起推上 GitHub repo(記得檢查 `flights.db` 檔案大小,GitHub 單檔限制 100MB,超過需改用 Git LFS)
-2. 到 [share.streamlit.io](https://share.streamlit.io) 用 GitHub 帳號登入
-3. 點選 **New app**,選擇這個 repo 與分支,Main file path 填 `app.py`
-4. 按下 **Deploy**,等待建置完成即可取得公開網址
-5. 之後每次 push 到 GitHub,Streamlit Cloud 會自動重新部署
-
-部署好之後,記得把網址貼回這份 README 最上面。
 
 ## 🗃️ 資料說明
 
