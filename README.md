@@ -6,7 +6,7 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**🔗 [線上 Demo]([#](https://tpekhhairline-jjhcwfvjjkqkrq3pwwkpfu.streamlit.app/))**
+**🔗 [線上 Demo]((https://tpekhhairline-jjhcwfvjjkqkrq3pwwkpfu.streamlit.app/))**
 
 ---
 
