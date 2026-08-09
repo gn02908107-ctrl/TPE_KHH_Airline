@@ -1,3 +1,5 @@
+[![每日更新機場航班資料](https://github.com/gn02908107-ctrl/TPE_KHH_Airline/actions/workflows/scrape.yml/badge.svg)](https://github.com/gn02908107-ctrl/TPE_KHH_Airline/actions/workflows/scrape.yml)
+
 # ✈️ 機場航班資訊儀表板
 
 一個以 **每日自動爬取的機場官方 API 資料** 為基礎,用 Streamlit 打造的互動式航班分析儀表板。涵蓋台灣桃園國際機場(TPE)與高雄國際機場(KHH)的離境 / 到場航班資訊。
