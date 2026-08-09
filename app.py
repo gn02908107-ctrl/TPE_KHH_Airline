@@ -140,7 +140,7 @@ DEST_INFO = {
 # 色盤:依航空公司輪流配色(數量夠多,避免相鄰航線撞色)
 ROUTE_COLORS = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
 
-st.set_page_config(page_title="機場航班資訊儀表板", layout="wide")
+st.set_page_config(page_title="台灣機場航班資訊分析儀表板", layout="wide")
 
 
 @st.cache_data
@@ -229,8 +229,8 @@ if airlines:
 
 fdf = df[mask]
 
-st.title("✈️ 七月機場航班資訊儀表板")
-st.caption("資料來源:政府開放資料 — 高雄(KHH) / 桃園(TPE) 機場航班紀錄")
+st.title("✈️ 台灣機場航班資訊分析儀表板")
+st.caption("資料來源:各機場官方網站 — 高雄(KHH) / 桃園(TPE) 機場航班紀錄")
 
 # ---------- KPI ----------
 col1, col2, col3, col4 = st.columns(4)
