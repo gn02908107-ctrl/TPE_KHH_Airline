@@ -6,17 +6,17 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**🔗 [線上 Demo](#)** ← 部署完成後把 Streamlit Cloud 網址貼在這裡
+**🔗 [線上 Demo]([#](https://tpekhhairline-jjhcwfvjjkqkrq3pwwkpfu.streamlit.app/))**
 
 ---
 
-## 📌 專案簡介
+## 專案簡介
 
 這個專案的資料並非取用現成的政府開放資料集,而是**自行開發爬蟲程式,每天定時從機場官方網站 API 抓取最新航班資訊**,經過清洗後存入 SQLite 資料庫,再透過 Streamlit + Plotly 打造成一個可互動篩選的視覺化儀表板。
 
-專案目標是練習完整的資料工程流程:**資料擷取 → 清洗 → 儲存 → 視覺化**,並產出一個可以實際操作、對外展示的作品。
+專案目標:**資料擷取 → 清洗 → 儲存 → 視覺化**
 
-## 🎯 主要功能
+## 主要功能
 
 - **多層級篩選**
   - 機場(TPE / KHH,單選 + 全選)
@@ -28,10 +28,10 @@
 - **每日航班趨勢圖**:依機場分色的每日航班數線圖
 - **熱門目的地 / 航空公司排行**:依航空公司分色的並排長條圖,方便比較不同航空公司在同一航線的班次
 - **航班類型比例圖**、**機型分佈圖**
-- **🗺️ 航線地圖**:以出發機場為起點畫出航線,依航空公司分色,滑鼠移過可查看航班數
+- **航線地圖**:以出發機場為起點畫出航線,依航空公司分色,滑鼠移過可查看航班數
 - **航班明細資料表**:可依目前篩選條件即時查看原始資料
 
-## 🛠️ 技術架構
+## 技術架構
 
 ```
 GitHub Actions(每日排程,台灣時間 00:30 自動觸發)
@@ -59,7 +59,7 @@ Streamlit + Pandas + Plotly (app.py)
 | 視覺化 | Plotly Express / Plotly Graph Objects |
 | 前端介面 | Streamlit |
 
-## 📂 專案結構
+## 專案結構
 
 ```
 .
@@ -72,7 +72,7 @@ Streamlit + Pandas + Plotly (app.py)
 └── README.md
 ```
 
-## 🚀 安裝與執行
+## 安裝與執行
 
 ```bash
 # 1. 安裝套件
@@ -98,17 +98,7 @@ python Scraper_KHH.py 2026-07-20     # 抓指定日期(補資料,注意日期格
 
 平常有 GitHub Actions 每日自動排程,不需要手動執行;只有補資料或本機測試時才需要。
 
-## ☁️ 部署到 Streamlit Community Cloud
-
-1. 將 `app.py`、`flights.db`、`requirements.txt` 一起推上 GitHub repo(記得檢查 `flights.db` 檔案大小,GitHub 單檔限制 100MB,超過需改用 Git LFS)
-2. 到 [share.streamlit.io](https://share.streamlit.io) 用 GitHub 帳號登入
-3. 點選 **New app**,選擇這個 repo 與分支,Main file path 填 `app.py`
-4. 按下 **Deploy**,等待建置完成即可取得公開網址
-5. 之後每次 push 到 GitHub,Streamlit Cloud 會自動重新部署
-
-部署好之後,記得把網址貼回這份 README 最上面。
-
-## 🔄 每日自動化排程
+## 每日自動化排程
 
 `.github/workflows/scrape.yml` 設定了 GitHub Actions,每天台灣時間 00:30 自動執行:
 
@@ -118,7 +108,7 @@ python Scraper_KHH.py 2026-07-20     # 抓指定日期(補資料,注意日期格
 
 因為 Streamlit Community Cloud 是接 GitHub repo 部署,repo 一更新,線上的 dashboard 也會自動套用最新資料,不需要手動介入。也可以在 GitHub 的 **Actions** 分頁手動點 **Run workflow** 觸發測試或補資料。
 
-## 🗃️ 資料說明
+## 資料說明
 
 資料庫包含兩張表,欄位皆相同:
 
@@ -133,13 +123,10 @@ python Scraper_KHH.py 2026-07-20     # 抓指定日期(補資料,注意日期格
 
 > 目的地的經緯度與地區/國家分類,是額外整理的對照表(`app.py` 中的 `DEST_INFO`),資料來源若新增未收錄的目的地名稱,儀表板會顯示提醒訊息而不會中斷執行。
 
-## 💡 未來優化方向
+## 未來優化方向
 
 - [x] 爬蟲排程自動化(GitHub Actions)並持續累積歷史資料
 - [ ] 跨月份 / 跨季節趨勢比較
 - [ ] 尖峰時段分析、航空公司市占率變化
 - [ ] 加入資料驗證與單元測試(例如爬蟲欄位格式、空值檢查)
 
-## 📄 授權
-
-MIT License
