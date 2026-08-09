@@ -1,14 +1,3 @@
-"""
-七月機場航班資訊 Dashboard(雛形)
-資料來源: flights.db (KHH_Flight_cleared / TPE_Flight_cleared)
-
-執行方式:
-    pip install streamlit pandas plotly
-    streamlit run app.py
-
-請確保 flights.db 與 app.py 放在同一個資料夾。
-"""
-
 import sqlite3
 from pathlib import Path
 
