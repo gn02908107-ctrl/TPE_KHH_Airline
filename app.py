@@ -145,8 +145,9 @@ ROUTE_COLORS = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
 st.set_page_config(page_title="台灣機場航班資訊分析儀表板", layout="wide")
 
 
+
 @st.cache_data
-def load_data():
+def load_data(db_mtime):
     conn = sqlite3.connect(DB_PATH)
     khh = pd.read_sql("SELECT * FROM KHH_Flight_cleared", conn)
     tpe = pd.read_sql("SELECT * FROM TPE_Flight_cleared", conn)
@@ -154,9 +155,8 @@ def load_data():
     df = pd.concat([khh, tpe], ignore_index=True)
     df["日期"] = pd.to_datetime(df["日期"], format="%Y/%m/%d")
     return df
-
-
-df = load_data()
+ 
+df = load_data(DB_PATH.stat().st_mtime)
 
 # ---------- 側邊欄篩選 ----------
 st.sidebar.header("篩選條件")
