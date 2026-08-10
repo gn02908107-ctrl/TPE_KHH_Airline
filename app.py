@@ -232,6 +232,13 @@ fdf = df[mask]
 st.title("✈️ 台灣機場航班資訊分析儀表板")
 st.caption("資料來源:各機場官方網站 — 高雄(KHH) / 桃園(TPE) 機場航班紀錄")
 
+db_updated = datetime.fromtimestamp(DB_PATH.stat().st_mtime)
+data_max_date = df["日期"].max()
+st.caption(
+    f"資料庫最後同步時間:{db_updated.strftime('%Y-%m-%d %H:%M')}"
+    f"　|　資料涵蓋至:{data_max_date.strftime('%Y-%m-%d')}"
+)
+
 # ---------- KPI ----------
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("總航班數", f"{len(fdf):,}")
