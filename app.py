@@ -255,20 +255,13 @@ st.divider()
 
 # ---------- 每日航班趨勢 ----------
 daily = fdf.groupby([fdf["日期"].dt.date, "機場名稱"]).size().reset_index(name="航班數")
+daily = daily.sort_values(["機場名稱", "日期"])
 
-
-def _drop_incomplete_tail(group):
-    """跨午夜航班先不畫出,等下次資料補齊後出現。"""
-    group = group.sort_values("日期")
-    if len(group) >= 2:
-        last_count = group["航班數"].iloc[-1]
-        typical_count = group["航班數"].median()
-        if last_count < typical_count * 0.5:
-            group = group.iloc[:-1]
-    return group
-
-
-daily = daily.groupby("機場名稱", group_keys=False).apply(_drop_incomplete_tail)
+# 跨午夜航班先不畫出
+typical_count = daily.groupby("機場名稱")["航班數"].transform("median")
+is_latest_day = daily["日期"] == daily.groupby("機場名稱")["日期"].transform("max")
+is_incomplete_tail = is_latest_day & (daily["航班數"] < typical_count * 0.5)
+daily = daily[~is_incomplete_tail]
 
 fig_trend = px.line(
     daily, x="日期", y="航班數", color="機場名稱", markers=True, title="每日航班數趨勢"
