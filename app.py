@@ -146,9 +146,10 @@ ROUTE_COLORS = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
 st.set_page_config(page_title="台灣機場航班資訊分析儀表板", layout="wide")
 
 
-
 @st.cache_data
 def load_data(db_mtime):
+    """db_mtime 只是用來當快取的判斷依據:flights.db 檔案一有更新(mtime 變動),
+    這個函式的參數就會跟著變,Streamlit 就會知道要重新讀取,而不是一直回傳舊的快取結果。"""
     conn = sqlite3.connect(DB_PATH)
     khh = pd.read_sql("SELECT * FROM KHH_Flight_cleared", conn)
     tpe = pd.read_sql("SELECT * FROM TPE_Flight_cleared", conn)
@@ -156,7 +157,8 @@ def load_data(db_mtime):
     df = pd.concat([khh, tpe], ignore_index=True)
     df["日期"] = pd.to_datetime(df["日期"], format="%Y/%m/%d")
     return df
- 
+
+
 df = load_data(DB_PATH.stat().st_mtime)
 
 # ---------- 側邊欄篩選 ----------
@@ -253,6 +255,21 @@ st.divider()
 
 # ---------- 每日航班趨勢 ----------
 daily = fdf.groupby([fdf["日期"].dt.date, "機場名稱"]).size().reset_index(name="航班數")
+
+
+def _drop_incomplete_tail(group):
+    """跨午夜航班先不畫出,等下次資料補齊後出現。"""
+    group = group.sort_values("日期")
+    if len(group) >= 2:
+        last_count = group["航班數"].iloc[-1]
+        typical_count = group["航班數"].median()
+        if last_count < typical_count * 0.5:
+            group = group.iloc[:-1]
+    return group
+
+
+daily = daily.groupby("機場名稱", group_keys=False).apply(_drop_incomplete_tail)
+
 fig_trend = px.line(
     daily, x="日期", y="航班數", color="機場名稱", markers=True, title="每日航班數趨勢"
 )

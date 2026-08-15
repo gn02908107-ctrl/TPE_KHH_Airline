@@ -24,7 +24,7 @@ PLANE_ICAO_MAP = {
     "A319-132": "A319", "A380-800": "A388", "B747-8I": "B748", "B737-8MA": "B38M",
 }
 
-# 目的地名稱統一對照
+# 目的地名稱統一對照(跟 dashboard 的 DEST_INFO key 要保持一致)
 DEST_RENAME_MAP = {
     "東京": "東京/成田",
     "羽田": "東京/羽田",
@@ -60,7 +60,7 @@ def fetch_flights(date_str: str, state: str) -> pd.DataFrame:
 
 
 def clean_flights(df_raw: pd.DataFrame) -> pd.DataFrame:
-    """把 API 原始欄位轉成 flights.db 的格式"""
+    """把 API 原始欄位轉成 flights.db 的格式(對應原 TPE_Flight_Datas_Select.py 的清洗邏輯)"""
     if df_raw.empty:
         return df_raw
 
@@ -82,7 +82,7 @@ def clean_flights(df_raw: pd.DataFrame) -> pd.DataFrame:
 
 
 def save_to_db(df: pd.DataFrame, target_date: str) -> None:
-    """寫入 flights.db,若該日期已存在資料先刪除再寫入,避免排程重跑造成重複"""
+
     import sqlite3
 
     conn = sqlite3.connect(DB_PATH)
@@ -94,11 +94,29 @@ def save_to_db(df: pd.DataFrame, target_date: str) -> None:
         )
     """)
 
-    # 清掉同一天的舊資料,確保不會重複
+    target_rows = df[df["日期"] == target_date]
+    stray_rows = df[df["日期"] != target_date]
+
+    # 目標日期:視為完整資料,先清除舊資料再整批寫入
     cur.execute(f"DELETE FROM {TABLE_NAME} WHERE 機場名稱 = 'TPE' AND 日期 = ?", (target_date,))
     conn.commit()
+    target_rows.to_sql(TABLE_NAME, conn, if_exists="append", index=False)
 
-    df.to_sql(TABLE_NAME, conn, if_exists="append", index=False)
+    # 跨日資料:逐筆比對,只新增資料庫裡還沒有的紀錄,不動該日期原有的其他資料
+    for _, row in stray_rows.iterrows():
+        cur.execute(
+            f"""SELECT 1 FROM {TABLE_NAME}
+                WHERE 機場名稱=? AND 航空公司=? AND 目的地=? AND 機型=? AND 日期=? AND 類型=?
+                LIMIT 1""",
+            (row["機場名稱"], row["航空公司"], row["目的地"], row["機型"], row["日期"], row["類型"]),
+        )
+        if cur.fetchone() is None:
+            cur.execute(
+                f"""INSERT INTO {TABLE_NAME} (機場名稱, 航空公司, 目的地, 機型, 日期, 類型)
+                    VALUES (?, ?, ?, ?, ?, ?)""",
+                (row["機場名稱"], row["航空公司"], row["目的地"], row["機型"], row["日期"], row["類型"]),
+            )
+    conn.commit()
     conn.close()
 
 
@@ -119,6 +137,12 @@ def main():
         return
 
     df_clean = clean_flights(df_raw)
+
+    # 將跨日航班分類並寫入
+    stray = df_clean[df_clean["日期"] != target_date]
+    if not stray.empty:
+        print(f"ℹ️ 有 {len(stray)} 筆跨日資料(可能是跨午夜航班),將依各自日期歸類寫入:{sorted(stray['日期'].unique())}")
+
     save_to_db(df_clean, target_date)
 
     print(f"✅ 成功寫入 {len(df_clean)} 筆資料至 {DB_PATH}({TABLE_NAME})")
