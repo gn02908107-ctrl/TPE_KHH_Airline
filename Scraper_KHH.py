@@ -116,10 +116,10 @@ def fetch_and_clean(target_date_dash: str) -> pd.DataFrame:
             "機型": df.get("airPlaneType", "N/A"),
             "日期": df["FDATE"],
             "類型": f_type,
-            "表定時間": sched_series,
-            "實際時間": actual_series,
+            "表定時間": sched_series.apply(_extract_time) if sched_series is not None else None,
+            "實際時間": actual_series.apply(_extract_time) if actual_series is not None else None,
         })
-        df_clean["是否取消"] = df_clean["實際時間"].apply(lambda v: _extract_time(v) is None).astype(int)
+        df_clean["是否取消"] = df_clean["實際時間"].isna().astype(int)
         df_clean["誤點分鐘"] = df_clean.apply(
             lambda row: None if row["是否取消"] else _compute_delay_minutes(row["表定時間"], row["實際時間"]),
             axis=1,
