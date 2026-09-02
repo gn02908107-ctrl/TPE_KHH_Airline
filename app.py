@@ -459,6 +459,6 @@ if "誤點分鐘" in table_df.columns:
 if "航班狀態" in table_df.columns or "是否取消" in table_df.columns:
     table_df["航班狀態"] = table_df.apply(_format_status, axis=1)
 
-table_df = table_df.drop(columns=["備註", "是否取消"], errors="ignore")  # 備註、是否取消欄不顯示
+table_df = table_df.drop(columns=["備註", "是否取消", "類型"], errors="ignore")  # 備註、是否取消欄不顯示
 
 st.dataframe(table_df, use_container_width=True, hide_index=True)
