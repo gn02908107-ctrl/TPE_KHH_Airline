@@ -2,18 +2,18 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
- 
+
 import pandas as pd
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
- 
+
 # ---------- 設定區 ----------
 DB_PATH = Path(__file__).parent / "flights.db"
 TABLE_NAME = "TPE_Flight_cleared"
- 
+
 API_URL = "https://www.taoyuan-airport.com/api/api/flight/a_flight"
- 
+
 # 機型 -> ICAO 代碼對照
 PLANE_ICAO_MAP = {
     "B777-300": "B773", "A330-300": "A333", "A321-200": "A321", "A321-271": "A21N",
@@ -26,14 +26,14 @@ PLANE_ICAO_MAP = {
     "A330-243": "A332", "B777-224": "B772", "B737-MAX": "B37M", "A330-200": "A332",
     "A319-132": "A319", "A380-800": "A388", "B747-8I": "B748", "B737-8MA": "B38M",
 }
- 
+
 # 目的地名稱統一對照(跟 dashboard 的 DEST_INFO key 要保持一致)
 DEST_RENAME_MAP = {
     "東京": "東京/成田",
     "羽田": "東京/羽田",
     "曼谷": "曼谷/蘇凡納布",
 }
- 
+
 session = requests.Session()
 session.headers.update({
     "User-Agent": (
@@ -43,7 +43,7 @@ session.headers.update({
     "Referer": "https://www.taoyuan-airport.com/flight_depart",
     "Content-Type": "application/json",
 })
- 
+
 # 自動重試設定:遇到連線逾時、讀取逾時、或伺服器錯誤(5xx)時,自動重試最多 4 次,
 # 每次重試間隔遞增(1s, 2s, 4s, 8s...),避免官網一時不穩就讓整個排程失敗。
 retry_strategy = Retry(
@@ -57,13 +57,13 @@ retry_strategy = Retry(
 adapter = HTTPAdapter(max_retries=retry_strategy)
 session.mount("https://", adapter)
 session.mount("http://", adapter)
- 
- 
+
+
 def fetch_flights(date_str: str, state: str):
     """
     date_str: 'YYYY/MM/DD'
     state: 'D'(離境) 或 'A'(到場)
- 
+
     回傳:
       - pd.DataFrame:成功取得資料(可能是空的,代表當天真的沒有這類航班)
       - None:重試多次後仍然失敗(網路問題、API 錯誤等),不代表當天沒有航班
@@ -75,7 +75,7 @@ def fetch_flights(date_str: str, state: str):
     except requests.exceptions.RequestException as e:
         print(f"❌ 抓取失敗(已重試但仍不成功):{state} {date_str} — {e}")
         return None
- 
+
     if response.status_code == 200:
         data = response.json()
         if isinstance(data, list) and len(data) > 0:
@@ -83,109 +83,191 @@ def fetch_flights(date_str: str, state: str):
             df["FlightType"] = "離境" if state == "D" else "到場"
             return df
         return pd.DataFrame()  # API 正常回應,但當天真的沒有這類航班
- 
+
     print(f"⚠️ API 回應非 200:{response.status_code}({state} {date_str})")
     return None
- 
- 
+
+
+def _compute_delay_minutes(otime: str, rtime: str):
+    """計算誤點分鐘數 = 實際時間(RTime) - 表定時間(OTime)。
+    OTime/RTime 只有時分(不含日期),所以如果表定時間接近午夜、實際時間跨到隔天
+    (或反過來),單純相減會得到一個離譜的大數字,這裡做跨午夜校正。
+    """
+    if not otime or not rtime:
+        return None
+    try:
+        o = datetime.strptime(str(otime)[:5], "%H:%M")
+        r = datetime.strptime(str(rtime)[:5], "%H:%M")
+    except ValueError:
+        return None
+
+    diff = (r - o).total_seconds() / 60
+
+    # 差距超過 12 小時,視為跨午夜,校正回合理範圍(誤點很少會真的超過 12 小時)
+    if diff > 720:
+        diff -= 1440
+    elif diff < -720:
+        diff += 1440
+
+    return diff
+
+
+def _is_cancelled(*texts) -> bool:
+    """依欄位文字判斷是否為取消班機(比單純看 RTime 是否為空更準確,RTime 是空值也可能
+    只是資料還沒更新完整,不一定代表取消)。可傳入多個欄位一起判斷,任一個命中就算取消。"""
+    for text in texts:
+        if not text:
+            continue
+        text_str = str(text).upper()
+        if "取消" in text_str or "CANCEL" in text_str:
+            return True
+    return False
+
+
 def clean_flights(df_raw: pd.DataFrame) -> pd.DataFrame:
     """把 API 原始欄位轉成 flights.db 的格式(對應原 TPE_Flight_Datas_Select.py 的清洗邏輯)"""
     if df_raw.empty:
         return df_raw
- 
-    df = df_raw[["AName", "CityName", "PlaneNo", "ODate", "FlightType"]].rename(
+
+    keep_cols = [
+        "AName", "CityName", "PlaneNo", "ODate", "FlightType",
+        "OTime", "RTime", "CurrentStatus", "Memo",
+    ]
+    df = df_raw[[c for c in keep_cols if c in df_raw.columns]].rename(
         columns={
             "AName": "航空公司",
             "CityName": "目的地",
             "PlaneNo": "機型",
             "ODate": "日期",
             "FlightType": "類型",
+            "OTime": "表定時間",
+            "RTime": "實際時間",
+            "CurrentStatus": "航班狀態",
+            "Memo": "備註",
         }
     )
     df.insert(0, "機場名稱", "TPE")
- 
+
     df["機型"] = df["機型"].replace(PLANE_ICAO_MAP)
     df["目的地"] = df["目的地"].replace(DEST_RENAME_MAP)
- 
+
+    for col in ["表定時間", "實際時間", "航班狀態", "備註"]:
+        if col not in df.columns:
+            df[col] = None
+
+    # 取消狀態主要看「備註(Memo)」,「航班狀態(CurrentStatus)」當備用判斷依據
+    df["是否取消"] = df.apply(
+        lambda row: _is_cancelled(row["備註"], row["航班狀態"]), axis=1
+    ).astype(int)
+
+    # 取消的班機不計算誤點分鐘(取消跟誤點是兩件事,不該混在一起平均);
+    # 其餘情況維持原本用 OTime/RTime 計算誤點分鐘的邏輯。
+    df["誤點分鐘"] = df.apply(
+        lambda row: None if row["是否取消"] else _compute_delay_minutes(row["表定時間"], row["實際時間"]),
+        axis=1,
+    )
+
     return df
- 
- 
+
+
 def save_to_db(df: pd.DataFrame, target_date: str) -> None:
     """寫入 flights.db。target_date 這天視為「完整資料」,先清除該日期舊資料再整批寫入
     (避免排程重跑造成重複)。df 若夾帶其他日期的跨日資料(例如跨午夜航班),因為那些
     資料只是「零星片段」不是完整的一天,不會整批清除該日期原有資料,而是逐筆比對後
     只新增「還不存在」的紀錄,避免蓋掉那個日期原本已經完整寫入的資料。"""
     import sqlite3
- 
+
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
- 
+
     cur.execute(f"""
         CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
-            機場名稱 TEXT, 航空公司 TEXT, 目的地 TEXT, 機型 TEXT, 日期 TEXT, 類型 TEXT
+            機場名稱 TEXT, 航空公司 TEXT, 目的地 TEXT, 機型 TEXT, 日期 TEXT, 類型 TEXT,
+            表定時間 TEXT, 實際時間 TEXT, 誤點分鐘 REAL, 航班狀態 TEXT, 備註 TEXT, 是否取消 INTEGER
         )
     """)
- 
+
+    # 舊版 flights.db(已部署在 GitHub 上的版本)沒有這幾個欄位,這裡自動幫舊表補上,
+    # 既有資料的這幾欄會是 NULL(沒有歷史 OTime/RTime/狀態可回填,屬於已知限制)。
+    cur.execute(f"PRAGMA table_info({TABLE_NAME})")
+    existing_cols = {row[1] for row in cur.fetchall()}
+    for col, col_type in [
+        ("表定時間", "TEXT"), ("實際時間", "TEXT"), ("誤點分鐘", "REAL"),
+        ("航班狀態", "TEXT"), ("備註", "TEXT"), ("是否取消", "INTEGER"),
+    ]:
+        if col not in existing_cols:
+            cur.execute(f"ALTER TABLE {TABLE_NAME} ADD COLUMN {col} {col_type}")
+    conn.commit()
+
     target_rows = df[df["日期"] == target_date]
     stray_rows = df[df["日期"] != target_date]
- 
+
     # 目標日期:視為完整資料,先清除舊資料再整批寫入
     cur.execute(f"DELETE FROM {TABLE_NAME} WHERE 機場名稱 = 'TPE' AND 日期 = ?", (target_date,))
     conn.commit()
     target_rows.to_sql(TABLE_NAME, conn, if_exists="append", index=False)
- 
-    # 跨日資料:逐筆比對,只新增資料庫裡還沒有的紀錄,不動該日期原有的其他資料
+
+    # 跨日資料:逐筆比對,只新增資料庫裡還沒有的紀錄,不動該日期原有的其他資料。
+    # 比對加入「表定時間」,避免同航空公司/同目的地/同機型/同日期但不同班次的航班被誤判成重複。
     for _, row in stray_rows.iterrows():
         cur.execute(
             f"""SELECT 1 FROM {TABLE_NAME}
                 WHERE 機場名稱=? AND 航空公司=? AND 目的地=? AND 機型=? AND 日期=? AND 類型=?
+                  AND (表定時間 IS ? OR 表定時間 = ?)
                 LIMIT 1""",
-            (row["機場名稱"], row["航空公司"], row["目的地"], row["機型"], row["日期"], row["類型"]),
+            (
+                row["機場名稱"], row["航空公司"], row["目的地"], row["機型"], row["日期"], row["類型"],
+                row.get("表定時間"), row.get("表定時間"),
+            ),
         )
         if cur.fetchone() is None:
             cur.execute(
-                f"""INSERT INTO {TABLE_NAME} (機場名稱, 航空公司, 目的地, 機型, 日期, 類型)
-                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (row["機場名稱"], row["航空公司"], row["目的地"], row["機型"], row["日期"], row["類型"]),
+                f"""INSERT INTO {TABLE_NAME}
+                    (機場名稱, 航空公司, 目的地, 機型, 日期, 類型, 表定時間, 實際時間, 誤點分鐘, 航班狀態, 備註, 是否取消)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    row["機場名稱"], row["航空公司"], row["目的地"], row["機型"], row["日期"], row["類型"],
+                    row.get("表定時間"), row.get("實際時間"), row.get("誤點分鐘"),
+                    row.get("航班狀態"), row.get("備註"), int(bool(row.get("是否取消"))),
+                ),
             )
     conn.commit()
     conn.close()
- 
- 
+
+
 def main():
     if len(sys.argv) > 1:
         target_date = sys.argv[1]  # 手動指定日期,格式 YYYY/MM/DD
     else:
         target_date = (datetime.now() - timedelta(days=1)).strftime("%Y/%m/%d")
- 
+
     print(f"正在抓取 {target_date} 的航班資料...")
- 
+
     df_d = fetch_flights(target_date, "D")
     df_a = fetch_flights(target_date, "A")
- 
+
     if df_d is None or df_a is None:
         print(f"❌ {target_date} 資料抓取失敗(已自動重試多次),不寫入資料庫,結束並回報失敗")
         sys.exit(1)
- 
+
     df_raw = pd.concat([df_d, df_a], ignore_index=True)
- 
+
     if df_raw.empty:
         print(f"  - {target_date} 當日確實沒有航班紀錄,不寫入資料庫")
         return
- 
+
     df_clean = clean_flights(df_raw)
- 
+
     # API 偶爾會夾帶幾筆隔天的航班(例如跨午夜離境),這些是真實航班、不是錯誤資料,
     # 會依它們「自己真正的日期」個別歸類寫入,不會混進 target_date 這批裡,也不會遺漏。
     stray = df_clean[df_clean["日期"] != target_date]
     if not stray.empty:
         print(f"ℹ️ 有 {len(stray)} 筆跨日資料(可能是跨午夜航班),將依各自日期歸類寫入:{sorted(stray['日期'].unique())}")
- 
+
     save_to_db(df_clean, target_date)
- 
+
     print(f"✅ 成功寫入 {len(df_clean)} 筆資料至 {DB_PATH}({TABLE_NAME})")
- 
- 
+
+
 if __name__ == "__main__":
     main()
- 
