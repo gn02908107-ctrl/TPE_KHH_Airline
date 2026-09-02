@@ -93,8 +93,8 @@ DEST_INFO = {
     "普吉": {"lat": 8.1132, "lon": 98.3169, "region": "亞洲", "country": "東南亞"},
     "曼谷": {"lat": 13.69, "lon": 100.7501, "region": "亞洲", "country": "東南亞"},
     "曼谷/廊曼": {"lat": 13.9126, "lon": 100.6067, "region": "亞洲", "country": "東南亞"},
-    "曼谷/蘇凡納布": {"lat": 13.682915, "lon": 100749413, "region": "亞洲", "country": "東南亞"},
-    "曼谷/素萬那普": {"lat": 13.682915, "lon": 100749413, "region": "亞洲", "country": "東南亞"},
+    "曼谷/蘇凡納布": {"lat": 13.682915, "lon": 100.749413, "region": "亞洲", "country": "東南亞"},
+    "曼谷/素萬那普": {"lat": 13.682915, "lon": 100.749413, "region": "亞洲", "country": "東南亞"},
     "檳城": {"lat": 5.2971, "lon": 100.2769, "region": "亞洲", "country": "東南亞"},
     "汶萊": {"lat": 4.9442, "lon": 114.9283, "region": "亞洲", "country": "東南亞"},
     "河內": {"lat": 21.2212, "lon": 105.8072, "region": "亞洲", "country": "東南亞"},
@@ -424,4 +424,41 @@ st.divider()
 
 # ---------- 明細資料表 ----------
 st.subheader("航班明細資料")
-st.dataframe(fdf.sort_values("日期"), use_container_width=True, hide_index=True)
+
+
+def _format_delay(minutes):
+    """把誤點分鐘數轉成好讀的文字:負數顯示為提前,正數顯示為誤點,0顯示為準時。"""
+    if pd.isna(minutes):
+        return None
+    minutes = round(minutes)
+    if minutes < 0:
+        return f"提前{abs(minutes)}分鐘"
+    if minutes == 0:
+        return "準時"
+    return f"誤點{minutes}分鐘"
+
+
+def _format_status(row):
+    """把航班狀態簡化成「出發/抵達機坪/取消」三種好懂的顯示文字。
+    優先看「是否取消」(缺值視為未取消),否則依「類型」判斷是離境還是到場。"""
+    if row.get("是否取消") == 1:
+        return "取消"
+    if row.get("類型") == "離境":
+        return "出發"
+    if row.get("類型") == "到場":
+        return "抵達機坪"
+    return None
+
+
+table_df = fdf.sort_values("日期", ascending=False).copy()  # 預設最新資料在最上面
+table_df["日期"] = table_df["日期"].dt.strftime("%Y/%m/%d")  # 只顯示西元年/月/日
+
+if "誤點分鐘" in table_df.columns:
+    table_df["誤點分鐘"] = table_df["誤點分鐘"].apply(_format_delay)
+
+if "航班狀態" in table_df.columns or "是否取消" in table_df.columns:
+    table_df["航班狀態"] = table_df.apply(_format_status, axis=1)
+
+table_df = table_df.drop(columns=["備註"], errors="ignore")  # 備註欄不顯示
+
+st.dataframe(table_df, use_container_width=True, hide_index=True)
