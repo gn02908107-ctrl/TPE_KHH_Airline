@@ -10,13 +10,13 @@ import streamlit as st
 
 DB_PATH = Path(__file__).parent / "flights.db"
 
+#出發機場座標
 AIRPORT_COORDS = {
     "TPE": (25.0797, 121.2342),
     "KHH": (22.5771, 120.3500),
 }
 
 # 目的地對照表(座標 + 地區分類 合併成一張表,要新增/改名只需要改這裡一個地方):
-# "目的地名稱": {"lat": 緯度, "lon": 經度, "region": 大洲/地區, "country": 國家}
 DEST_INFO = {
     "上海/浦東": {"lat": 31.1443, "lon": 121.8083, "region": "亞洲", "country": "中國"},
     "北京": {"lat": 40.0799, "lon": 116.6031, "region": "亞洲", "country": "中國"},
@@ -158,10 +158,9 @@ ROUTE_COLORS = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
 st.set_page_config(page_title="台灣機場航班資訊分析儀表板", layout="wide")
 
 
+#資料載入與快取
 @st.cache_data
 def load_data(db_mtime):
-    """db_mtime 只是用來當快取的判斷依據:flights.db 檔案一有更新(mtime 變動),
-    這個函式的參數就會跟著變,Streamlit 就會知道要重新讀取,而不是一直回傳舊的快取結果。"""
     conn = sqlite3.connect(DB_PATH)
     khh = pd.read_sql("SELECT * FROM KHH_Flight_cleared", conn)
     tpe = pd.read_sql("SELECT * FROM TPE_Flight_cleared", conn)
